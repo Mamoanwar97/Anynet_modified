@@ -1,0 +1,75 @@
+[2021-01-18 17:24:23 lidar.py:82] INFO     channels_3d: 4
+[2021-01-18 17:24:23 lidar.py:82] INFO     datapath: path-to-kitti
+[2021-01-18 17:24:23 lidar.py:82] INFO     datatype: other
+[2021-01-18 17:24:23 lidar.py:82] INFO     epochs: 300
+[2021-01-18 17:24:23 lidar.py:82] INFO     evaluate: True
+[2021-01-18 17:24:23 lidar.py:82] INFO     growth_rate: [4, 1, 1]
+[2021-01-18 17:24:23 lidar.py:82] INFO     init_channels: 1
+[2021-01-18 17:24:23 lidar.py:82] INFO     layers_3d: 4
+[2021-01-18 17:24:23 lidar.py:82] INFO     loss_weights: [0.25, 0.5, 1.0, 1.0]
+[2021-01-18 17:24:23 lidar.py:82] INFO     lr: 0.0005
+[2021-01-18 17:24:23 lidar.py:82] INFO     max_disparity: 192
+[2021-01-18 17:24:23 lidar.py:82] INFO     maxdisp: 192
+[2021-01-18 17:24:23 lidar.py:82] INFO     maxdisplist: [12, 3, 3]
+[2021-01-18 17:24:23 lidar.py:82] INFO     nblocks: 2
+[2021-01-18 17:24:23 lidar.py:82] INFO     pretrained: checkpoint/kitti2015_ck/checkpoint.tar
+[2021-01-18 17:24:23 lidar.py:82] INFO     print_freq: 5
+[2021-01-18 17:24:23 lidar.py:82] INFO     resume: None
+[2021-01-18 17:24:23 lidar.py:82] INFO     save_path: results/
+[2021-01-18 17:24:23 lidar.py:82] INFO     split_file: None
+[2021-01-18 17:24:23 lidar.py:82] INFO     spn_init_channels: 8
+[2021-01-18 17:24:23 lidar.py:82] INFO     start_epoch_for_spn: 121
+[2021-01-18 17:24:23 lidar.py:82] INFO     test_bsize: 8
+[2021-01-18 17:24:23 lidar.py:82] INFO     train_bsize: 6
+[2021-01-18 17:24:23 lidar.py:82] INFO     with_spn: True
+[2021-01-18 17:24:26 lidar.py:92] INFO     => loaded pretrained model 'checkpoint/kitti2015_ck/checkpoint.tar'
+[2021-01-18 17:26:18 lidar.py:82] INFO     channels_3d: 4
+[2021-01-18 17:26:18 lidar.py:82] INFO     datapath: path-to-kitti
+[2021-01-18 17:26:18 lidar.py:82] INFO     datatype: other
+[2021-01-18 17:26:18 lidar.py:82] INFO     epochs: 300
+[2021-01-18 17:26:18 lidar.py:82] INFO     evaluate: True
+[2021-01-18 17:26:18 lidar.py:82] INFO     growth_rate: [4, 1, 1]
+[2021-01-18 17:26:18 lidar.py:82] INFO     init_channels: 1
+[2021-01-18 17:26:18 lidar.py:82] INFO     layers_3d: 4
+[2021-01-18 17:26:18 lidar.py:82] INFO     loss_weights: [0.25, 0.5, 1.0, 1.0]
+[2021-01-18 17:26:18 lidar.py:82] INFO     lr: 0.0005
+[2021-01-18 17:26:18 lidar.py:82] INFO     max_disparity: 192
+[2021-01-18 17:26:18 lidar.py:82] INFO     maxdisp: 192
+[2021-01-18 17:26:18 lidar.py:82] INFO     maxdisplist: [12, 3, 3]
+[2021-01-18 17:26:18 lidar.py:82] INFO     nblocks: 2
+[2021-01-18 17:26:18 lidar.py:82] INFO     pretrained: checkpoint/kitti2015_ck/checkpoint.tar
+[2021-01-18 17:26:18 lidar.py:82] INFO     print_freq: 5
+[2021-01-18 17:26:18 lidar.py:82] INFO     resume: None
+[2021-01-18 17:26:18 lidar.py:82] INFO     save_path: results/
+[2021-01-18 17:26:18 lidar.py:82] INFO     split_file: None
+[2021-01-18 17:26:18 lidar.py:82] INFO     spn_init_channels: 8
+[2021-01-18 17:26:18 lidar.py:82] INFO     start_epoch_for_spn: 121
+[2021-01-18 17:26:18 lidar.py:82] INFO     test_bsize: 8
+[2021-01-18 17:26:18 lidar.py:82] INFO     train_bsize: 6
+[2021-01-18 17:26:18 lidar.py:82] INFO     with_spn: True
+[2021-01-18 17:26:21 lidar.py:92] INFO     => loaded pretrained model 'checkpoint/kitti2015_ck/checkpoint.tar'
+[2021-01-18 17:30:21 lidar.py:82] INFO     channels_3d: 4
+[2021-01-18 17:30:21 lidar.py:82] INFO     datapath: path-to-kitti
+[2021-01-18 17:30:21 lidar.py:82] INFO     datatype: other
+[2021-01-18 17:30:21 lidar.py:82] INFO     epochs: 300
+[2021-01-18 17:30:21 lidar.py:82] INFO     evaluate: True
+[2021-01-18 17:30:21 lidar.py:82] INFO     growth_rate: [4, 1, 1]
+[2021-01-18 17:30:21 lidar.py:82] INFO     init_channels: 1
+[2021-01-18 17:30:21 lidar.py:82] INFO     layers_3d: 4
+[2021-01-18 17:30:21 lidar.py:82] INFO     loss_weights: [0.25, 0.5, 1.0, 1.0]
+[2021-01-18 17:30:21 lidar.py:82] INFO     lr: 0.0005
+[2021-01-18 17:30:21 lidar.py:82] INFO     max_disparity: 192
+[2021-01-18 17:30:21 lidar.py:82] INFO     maxdisp: 192
+[2021-01-18 17:30:21 lidar.py:82] INFO     maxdisplist: [12, 3, 3]
+[2021-01-18 17:30:21 lidar.py:82] INFO     nblocks: 2
+[2021-01-18 17:30:21 lidar.py:82] INFO     pretrained: checkpoint/kitti2015_ck/checkpoint.tar
+[2021-01-18 17:30:21 lidar.py:82] INFO     print_freq: 5
+[2021-01-18 17:30:21 lidar.py:82] INFO     resume: None
+[2021-01-18 17:30:21 lidar.py:82] INFO     save_path: results/
+[2021-01-18 17:30:21 lidar.py:82] INFO     split_file: None
+[2021-01-18 17:30:21 lidar.py:82] INFO     spn_init_channels: 8
+[2021-01-18 17:30:21 lidar.py:82] INFO     start_epoch_for_spn: 121
+[2021-01-18 17:30:21 lidar.py:82] INFO     test_bsize: 8
+[2021-01-18 17:30:21 lidar.py:82] INFO     train_bsize: 6
+[2021-01-18 17:30:21 lidar.py:82] INFO     with_spn: True
+[2021-01-18 17:30:24 lidar.py:92] INFO     => loaded pretrained model 'checkpoint/kitti2015_ck/checkpoint.tar'
