@@ -1,2 +1,6 @@
+__pycache__
 path-to-kitti2015/
 path-to-kitti2012/
+results/
+*.txt
+*.bin
