@@ -131,7 +131,7 @@ class AnyNet(nn.Module):
         feats_l = self.feature_extraction(left)
         feats_r = self.feature_extraction(right)
         pred = []
-        times = []
+        # times = []
         for scale in range(len(feats_l)):
             if scale > 0:
                 wflow = F.interpolate(pred[scale-1], (feats_l[scale].size(2), feats_l[scale].size(3)),
@@ -150,13 +150,13 @@ class AnyNet(nn.Module):
                 pred_low_res = pred_low_res * img_size[2] / pred_low_res.size(2)
                 disp_up = F.interpolate(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
                 pred.append(disp_up)
-                times.append(time.time())
+                # times.append(time.time())
             else:
                 pred_low_res = disparityregression2(-self.maxdisplist[scale]+1, self.maxdisplist[scale], stride=1)(F.softmax(-cost, dim=1))
                 pred_low_res = pred_low_res * img_size[2] / pred_low_res.size(2)
                 disp_up = F.interpolate(pred_low_res, (img_size[2], img_size[3]), mode='bilinear')
                 pred.append(disp_up+pred[scale-1])
-                times.append(time.time())
+                # times.append(time.time())
                 # 
 
 
@@ -172,9 +172,9 @@ class AnyNet(nn.Module):
             refine_flow = self.spn_layer(self.refine_spn[1](pred_flow), G1, G2, G3)
             refine_flow = self.refine_spn[2](refine_flow)
             pred.append(nn.functional.interpolate(refine_flow, (img_size[2] , img_size[3]), mode='bilinear'))
-            times.append(time.time())
+            # times.append(time.time())
 
-        return (pred, times)
+        return pred
 
 class disparityregression2(nn.Module):
     def __init__(self, start, end, stride=1):

@@ -7,8 +7,10 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 import time
-from dataloader import listflowfile as lt
-from dataloader import SecenFlowLoader as DA
+# from dataloader import listflowfile as lt
+# from dataloader import SecenFlowLoader as DA
+from dataloader import KITTILoader as DA
+from dataloader import diy_dataset as lt
 import utils.logger as logger
 
 import models.anynet
@@ -62,6 +64,7 @@ def main():
 
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
+
     log = logger.setup_logger(args.save_path + '/training.log')
     for key, value in sorted(vars(args).items()):
         log.info(str(key) + ': ' + str(value))
@@ -123,9 +126,9 @@ def train(dataloader, model, optimizer, log, epoch=0):
             continue
         mask.detach_()
         outputs = model(imgL, imgR)
+        # print(outputs[0].shape)
         outputs = [torch.squeeze(output, 1) for output in outputs]
-        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)
-                for x in range(stages)]
+        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)for x in range(stages)]
         sum(loss).backward()
         optimizer.step()
 

@@ -1,7 +1,9 @@
 import argparse
 import os
 import numpy as np
-import cv2
+import skimage
+import skimage.io
+import scipy.misc as ssc
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -10,10 +12,10 @@ import torch.utils.data
 import torch.nn.functional as F
 from torchvision.utils import save_image
 import time
-from dataloader import KITTILoader as DA
 import utils.logger as logger
 import torch.backends.cudnn as cudnn
 from preprocessing.generate_lidar import project_disp_to_points, project_depth_to_points, Calibration
+from dataloader import KITTILoader as DA
 from dataloader import diy_dataset as ls
 
 
@@ -32,7 +34,7 @@ parser.add_argument('--epochs', type=int, default=300,
                     help='number of epochs to train')
 parser.add_argument('--train_bsize', type=int, default=6,
                     help='batch size for training (default: 6)')
-parser.add_argument('--test_bsize', type=int, default=8,
+parser.add_argument('--test_bsize', type=int, default=1,
                     help='batch size for testing (default: 8)')
 parser.add_argument('--save_path', type=str, default='results/pseudoLidar/',
                     help='the path of saving checkpoints and log')
@@ -84,35 +86,54 @@ def main():
     args.start_epoch = 0
     cudnn.benchmark = True
     if args.evaluate:
+        print(len(TestImgLoader))
         all_outputs = evaluate(TestImgLoader, model)
-        xx = [x for x in range(4)]
         for y in range(len(all_outputs)):
+            """
+            Array of batches loop
+            """
             outputs = all_outputs[y]
             for x in range(len(outputs)):
+                """
+                4 stages of 1 batch
+
+                x is stage number
+                """
                 output = torch.squeeze(outputs[x], 1)
                 for i in range(output.size()[0]):
+                    """
+                    images in 1 batch
+                    i is the image index in the batch
+                    """
                     if x % 4 == 3:
                         path = args.save_path
-                        predix = str(xx[i + y]).zfill(6)
+                        predix = str(i*output.size()[0]+y).zfill(6)
 
                         img_cpu = np.asarray(output.cpu())
-                        disp_map = np.clip(img_cpu[i, :, :], 0, 2**16)
+                        # print(np.min(img_cpu), np.max(img_cpu))
 
-                        img_save = (disp_map * 450).astype(np.uint16)
-                        cv2.imwrite(path + 'disparity/' + predix + '.png', img_save)
+                        disp_map = img_cpu[i, :, :]
+                        # disp_map = np.clip(img_cpu[i, :, :], 0, 2**16)
+                        # disp_map = (img_cpu[i, :, :] - np.min(img_cpu[i, :, :])) / (np.max(img_cpu[i, :, :]) - np.min(img_cpu[i, :, :]))
+                        # disp_map = (disp_map*255).astype(np.uint8)
+                        # assert os.path.isdir(path + 'disparity/')
+                        skimage.io.imsave(path + 'disparity/' + predix + '.png',(disp_map*256).astype('uint16'))
+                        # ssc.imsave(path + 'disparity/' + predix + '.png', disp_map)
 
+                        print(np.min(disp_map), np.max(disp_map))
                         np.save(path + 'npy/' + predix, disp_map)
-                        calib_file = '{}/{}.txt'.format(args.datapath + '/calib', predix)
+                        calib_file = '{}/{}.txt'.format(args.datapath + '/training/calib', predix)
                         calib = Calibration(calib_file)
-                        
-                        disp_map = (disp_map*256).astype(np.uint16)/256.
+
+                        disp_map = (disp_map*255).astype(np.uint16)/255.
+                        # print(disp_map.dtype)
                         lidar = project_disp_to_points(calib, disp_map, args.max_high)
 
                         lidar = np.concatenate([lidar, np.ones((lidar.shape[0], 1))], 1)
                         lidar = lidar.astype(np.float32)
 
                         lidar.tofile('{}/{}.bin'.format(path + 'point_cloud', predix))
-        print('Finish Depth {}'.format(predix))
+                        print('Finish Depth {}'.format(predix))
         return
 
 def test(dataloader, model, log):
@@ -167,12 +188,12 @@ def evaluate(dataloader, model):
         imgR = imgR.float().cuda()
         
         with torch.no_grad():
-            startTime = time.time()
-            outputs, all_time = model(imgL, imgR)
+            # startTime = time.time()
+            outputs = model(imgL, imgR)
             all_outputs.append(outputs)
-            all_time = ''.join(['At Stage {}: time {:.2f} ms ~ {:.2f} FPS\n'.format(
-                x, (all_time[x]-startTime) * 1000,  1 / ((all_time[x]-startTime))) for x in range(len(all_time))])
-            print(all_time)
+            # all_time = ''.join(['At Stage {}: time {:.2f} ms ~ {:.2f} FPS\n'.format(
+            #     x, (all_time[x]-startTime) * 1000,  1 / ((all_time[x]-startTime))) for x in range(len(all_time))])
+            # print(all_time)
 
     return all_outputs
 

@@ -10,7 +10,7 @@ from . import preprocess
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
-    '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
+    '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', '.npy'
 ]
 
 def is_image_file(filename):
@@ -42,6 +42,8 @@ class myImageFloder(data.Dataset):
         right_img = self.loader(right)
         dataL = self.dploader(disp_L)
 
+        # print(" a7la 3esh taza 3alyk")
+        # print(np.min(dataL), np.max(dataL))
 
         if self.training:  
            w, h = left_img.size
@@ -53,7 +55,11 @@ class myImageFloder(data.Dataset):
            left_img = left_img.crop((x1, y1, x1 + tw, y1 + th))
            right_img = right_img.crop((x1, y1, x1 + tw, y1 + th))
 
-           dataL = np.ascontiguousarray(dataL,dtype=np.float32)/256
+           if np.max(dataL) <= 256:
+               dataL = np.ascontiguousarray(dataL,dtype=np.float32)
+           else:
+               dataL = np.ascontiguousarray(dataL,dtype=np.float32)/256
+        
            dataL = dataL[y1:y1 + th, x1:x1 + tw]
 
            processed = preprocess.get_transform(augment=False)  
@@ -69,12 +75,18 @@ class myImageFloder(data.Dataset):
            w1, h1 = left_img.size
 
            dataL = dataL.crop((w-1232, h-368, w, h))
-           dataL = np.ascontiguousarray(dataL,dtype=np.float32)/256
-
+        #    print("Before processing")
+        #    print(np.min(dataL), np.max(dataL))
+           if np.max(dataL) <= 256:
+               dataL = np.ascontiguousarray(dataL, dtype=np.float32)
+           else:
+               dataL = np.ascontiguousarray(dataL, dtype=np.float32)/256
            processed = preprocess.get_transform(augment=False)  
            left_img       = processed(left_img)
            right_img      = processed(right_img)
-
+        #    print("After processing")
+        #    print(np.min(dataL), np.max(dataL))
+        #    print("\n\n")
            return left_img, right_img, dataL
 
     def __len__(self):

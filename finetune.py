@@ -1,20 +1,16 @@
 import argparse
 import os
-import numpy as np
-import cv2
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
-from torchvision.utils import save_image
 import time
 from dataloader import KITTILoader as DA
 import utils.logger as logger
 import torch.backends.cudnn as cudnn
-
-
+import numpy as np
 import models.anynet
 
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
@@ -26,11 +22,11 @@ parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
                     help='datapath')
 parser.add_argument('--datapath', default=None, help='datapath')
-parser.add_argument('--epochs', type=int, default=300,
+parser.add_argument('--epochs', type=int, default=5,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=6,
+parser.add_argument('--train_bsize', type=int, default=64,
                     help='batch size for training (default: 6)')
-parser.add_argument('--test_bsize', type=int, default=8,
+parser.add_argument('--test_bsize', type=int, default=64,
                     help='batch size for testing (default: 8)')
 parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
@@ -46,10 +42,11 @@ parser.add_argument('--channels_3d', type=int, default=4, help='number of initia
 parser.add_argument('--layers_3d', type=int, default=4, help='number of initial layers in 3d network')
 parser.add_argument('--growth_rate', type=int, nargs='+', default=[4,1,1], help='growth rate in the 3d network')
 parser.add_argument('--spn_init_channels', type=int, default=8, help='initial channels for spnet')
-parser.add_argument('--start_epoch_for_spn', type=int, default=121)
+parser.add_argument('--start_epoch_for_spn', type=int, default=0)
 parser.add_argument('--pretrained', type=str, default='results/pretrained_anynet/checkpoint.tar',
                     help='pretrained model path')
-parser.add_argument('--split_file', type=str, default=None)
+parser.add_argument('--train_file', type=str, default=None)
+parser.add_argument('--validation_file', type=str, default=None)
 parser.add_argument('--evaluate', action='store_true')
 
 
@@ -68,8 +65,7 @@ def main():
     log = logger.setup_logger(args.save_path + '/training.log')
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
-        args.datapath,log, args.split_file)
-
+        args.datapath, args.train_file, args.validation_file)
 
     TrainImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
@@ -78,7 +74,7 @@ def main():
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
-    
+
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
     for key, value in sorted(vars(args).items()):
@@ -94,7 +90,7 @@ def main():
             checkpoint = torch.load(args.pretrained)
             model.load_state_dict(checkpoint['state_dict'], strict=False)
             log.info("=> loaded pretrained model '{}'"
-                    .format(args.pretrained))
+                     .format(args.pretrained))
         else:
             log.info("=> no pretrained model found at '{}'".format(args.pretrained))
             log.info("=> Will start from scratch.")
@@ -106,7 +102,7 @@ def main():
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             log.info("=> loaded checkpoint '{}' (epoch {})"
-                    .format(args.resume, checkpoint['epoch']))
+                     .format(args.resume, checkpoint['epoch']))
         else:
             log.info("=> no checkpoint found at '{}'".format(args.resume))
             log.info("=> Will start from scratch.")
@@ -115,22 +111,7 @@ def main():
     cudnn.benchmark = True
     start_full_time = time.time()
     if args.evaluate:
-        # all_outputs = test(TestImgLoader, model, log)
-        all_outputs = evaluate(TestImgLoader, model, log)
-        # xx = [13, 32, 36, 37, 38, 43, 46, 54, 58, 62, 75, 76, 79, 82, 92, 93, 99, 106, 108, 114, 115, 117, 124, 131, 135, 138, 139, 141, 144, 148, 159, 162, 164, 167, 176, 179, 182, 192, 193, 199]
-        xx = [x for x in range(4)]
-        for y in range(len(all_outputs)):
-            outputs = all_outputs[y]
-            for x in range(len(outputs)):
-                output = torch.squeeze(outputs[x], 1)
-                for i in range(output.size()[0]):
-                    path = './results/output/' + str(args.datatype) + '/'
-                    img_cpu = np.asarray(output.cpu())
-                    img_save = np.clip(img_cpu[i, :, :], 0, 2**16)
-                    np.save(path + 'O_' + str(xx[i + y]) + '_' + str(x), img_save)
-                    img_save = (img_save * 450).astype(np.uint16)
-                    name = path + 'O_' + str(xx[i + y]) + '_' + str(x) + '.png'
-                    cv2.imwrite(name, img_save)
+        test(TestImgLoader, model, log)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -158,7 +139,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
     stages = 3 + args.with_spn
     losses = [AverageMeter() for _ in range(stages)]
     length_loader = len(dataloader)
-
+    flag = 0
     model.train()
 
     for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
@@ -180,6 +161,12 @@ def train(dataloader, model, optimizer, log, epoch=0):
             num_out = len(outputs)
 
         outputs = [torch.squeeze(output, 1) for output in outputs]
+
+        # if flag == 0:
+        #     printing = outputs[0]
+        #     print(printing)
+        #     flag = 1
+
         loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)
                 for x in range(num_out)]
         sum(loss).backward()
@@ -202,79 +189,35 @@ def test(dataloader, model, log):
 
     stages = 3 + args.with_spn
     D1s = [AverageMeter() for _ in range(stages)]
-
-    all_outputs = []
+    length_loader = len(dataloader)
 
     model.eval()
-    # name = [13, 32, 36, 37, 38, 43, 46, 54, 58, 62, 75, 76, 79, 82, 92, 93, 99, 106, 108, 114, 115, 117, 124, 131, 135, 138, 139, 141, 144, 148, 159, 162, 164, 167, 176, 179, 182, 192, 193, 199]
-    name = [x for x in range(4)]
+
     for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
-    
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
 
-        #print('disp_l shape: {},  imgL shape: {}, imgR shape: {}'.format(disp_L.shape, imgL.shape, imgR.shape))
-        
-        for z in range(disp_L.shape[0]):
-            path = './results/output/' + str(args.datatype)
-            image_name_input = path +'/d_'+ str(name[batch_idx]) + '.png'
-            save_image(disp_L[z], image_name_input)
-
-
-
         with torch.no_grad():
-            
-            startTime = time.time()
-            outputs, all_time = model(imgL, imgR)
-            
-            all_outputs.append(outputs)
+            outputs = model(imgL, imgR)
             for x in range(stages):
                 output = torch.squeeze(outputs[x], 1)
-                # print(output.shape)
-                # print(output[1])
                 D1s[x].update(error_estimating(output, disp_L).item())
-        
-        # if(batch_idx == length_loader-1):
-                # for y in range(outputs[x].shape[0]):
 
-        # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
-        # log.info('[{}/{}] {}'.format(batch_idx, length_loader, info_str))
-        all_time = ''.join(['At Stage {}: time {:.2f} ms ~ {:.2f} FPS, error: {:.2f}%\n'.format(
-            x, (all_time[x]-startTime) * 1000,  1 / ((all_time[x]-startTime)), D1s[x].val*100) for x in range(len(all_time))])
-        print(all_time)
-    
-    #print(D1s)
+        info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
+
+        log.info('[{}/{}] {}'.format(
+            batch_idx, length_loader, info_str))
+
     info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
     log.info('Average test 3-Pixel Error = ' + info_str)
-
-    return all_outputs
-
-def evaluate(dataloader, model, log):
-    
-    all_outputs = []
-    model.eval()
-
-    for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
-        imgL = imgL.float().cuda()
-        imgR = imgR.float().cuda()
-        
-        with torch.no_grad():
-            startTime = time.time()
-            outputs, all_time = model(imgL, imgR)
-            all_outputs.append(outputs)
-        
-        all_time = ''.join(['At Stage {}: time {:.2f} ms ~ {:.2f} FPS\n'.format(
-            x, (all_time[x]-startTime) * 1000,  1 / ((all_time[x]-startTime))) for x in range(len(all_time))])
-        print(all_time)
-    return all_outputs
-
 
 
 def error_estimating(disp, ground_truth, maxdisp=192):
     gt = ground_truth
     mask = gt > 0
     mask = mask * (gt < maxdisp)
+
     errmap = torch.abs(disp - gt)
     err3 = ((errmap[mask] > 3.) & (errmap[mask] / gt[mask] > 0.05)).sum()
     return err3.float() / mask.sum().float()

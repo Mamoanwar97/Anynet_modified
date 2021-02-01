@@ -1,10 +1,14 @@
 __pycache__
 
-path-to-kitti2015
-path-to-kitti2012
-path-to-kitti
-
-results
 *.txt
 *.bin
 *.npy
+*.png
+*.tar
+
+checkpoint
+
+path-to-kitti*
+
+result*
+
