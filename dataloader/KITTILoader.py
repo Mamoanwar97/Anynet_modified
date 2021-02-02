@@ -81,6 +81,7 @@ class myImageFloder(data.Dataset):
                dataL = np.ascontiguousarray(dataL, dtype=np.float32)
            else:
                dataL = np.ascontiguousarray(dataL, dtype=np.float32)/256
+    
            processed = preprocess.get_transform(augment=False)  
            left_img       = processed(left_img)
            right_img      = processed(right_img)

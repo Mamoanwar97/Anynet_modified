@@ -23,11 +23,11 @@ parser.add_argument('--loss_weights', type=float, nargs='+', default=[0.25, 0.5,
 parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datapath', default='dataset/',
                     help='datapath')
-parser.add_argument('--epochs', type=int, default=10,
+parser.add_argument('--epochs', type=int, default=20,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=6,
+parser.add_argument('--train_bsize', type=int, default=16,
                     help='batch size for training (default: 12)')
-parser.add_argument('--test_bsize', type=int, default=4,
+parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
 parser.add_argument('--save_path', type=str, default='results/pretrained_anynet',
                     help='the path of saving checkpoints and log')
@@ -43,7 +43,8 @@ parser.add_argument('--channels_3d', type=int, default=4, help='number of initia
 parser.add_argument('--layers_3d', type=int, default=4, help='number of initial layers of the 3d network')
 parser.add_argument('--growth_rate', type=int, nargs='+', default=[4,1,1], help='growth rate in the 3d network')
 parser.add_argument('--spn_init_channels', type=int, default=8, help='initial channels for spnet')
-
+parser.add_argument('--train_file', type=str, default=None)
+parser.add_argument('--validation_file', type=str, default=None)
 
 args = parser.parse_args()
 
@@ -52,7 +53,7 @@ def main():
     global args
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(
-        args.datapath)
+        args.datapath, args.train_file, args.validation_file)
 
     TrainImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
@@ -96,12 +97,14 @@ def main():
 
         train(TrainImgLoader, model, optimizer, log, epoch)
 
-        savefilename = args.save_path + '/checkpoint.tar'
+        savefilename = args.save_path + '/checkpoint'+str(epoch)+'.tar'
         torch.save({
             'epoch': epoch,
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, savefilename)
+
+        test(TestImgLoader, model, log)
 
     test(TestImgLoader, model, log)
     log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))

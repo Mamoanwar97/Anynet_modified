@@ -22,11 +22,11 @@ parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
                     help='datapath')
 parser.add_argument('--datapath', default=None, help='datapath')
-parser.add_argument('--epochs', type=int, default=5,
+parser.add_argument('--epochs', type=int, default=20,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=64,
+parser.add_argument('--train_bsize', type=int, default=16,
                     help='batch size for training (default: 6)')
-parser.add_argument('--test_bsize', type=int, default=64,
+parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
 parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
@@ -120,7 +120,7 @@ def main():
 
         train(TrainImgLoader, model, optimizer, log, epoch)
 
-        savefilename = args.save_path + '/checkpoint.tar'
+        savefilename = args.save_path + '/checkpoint' + str(epoch) + '.tar'
         torch.save({
             'epoch': epoch,
             'state_dict': model.state_dict(),
