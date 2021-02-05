@@ -22,7 +22,7 @@ parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
                     help='datapath')
 parser.add_argument('--datapath', default=None, help='datapath')
-parser.add_argument('--epochs', type=int, default=20,
+parser.add_argument('--epochs', type=int, default=50,
                     help='number of epochs to train')
 parser.add_argument('--train_bsize', type=int, default=16,
                     help='batch size for training (default: 6)')
@@ -35,7 +35,7 @@ parser.add_argument('--resume', type=str, default=None,
 parser.add_argument('--lr', type=float, default=5e-4,
                     help='learning rate')
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
-parser.add_argument('--print_freq', type=int, default=5, help='print frequence')
+parser.add_argument('--print_freq', type=int, default=25, help='print frequence')
 parser.add_argument('--init_channels', type=int, default=1, help='initial channels for 2d feature extractor')
 parser.add_argument('--nblocks', type=int, default=2, help='number of layers in each stage')
 parser.add_argument('--channels_3d', type=int, default=4, help='number of initial channels 3d feature extractor ')
@@ -47,7 +47,9 @@ parser.add_argument('--pretrained', type=str, default='results/pretrained_anynet
                     help='pretrained model path')
 parser.add_argument('--train_file', type=str, default=None)
 parser.add_argument('--validation_file', type=str, default=None)
+parser.add_argument('--load_npy', action='store_true')
 parser.add_argument('--evaluate', action='store_true')
+parser.add_argument('--split_file', type=str, default=None)
 
 
 args = parser.parse_args()
@@ -64,17 +66,28 @@ def main():
     global args
     log = logger.setup_logger(args.save_path + '/training.log')
 
-    train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
-        args.datapath, args.train_file, args.validation_file)
+    if args.datatype == 'other':
+        train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
+            args.datapath, args.train_file, args.validation_file, args.load_npy)
 
-    TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
-        batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+        TrainImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True, load_npy=args.load_npy),
+            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
-    TestImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
-        batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+        TestImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, load_npy=args.load_npy),
+            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+    else:
+        train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
+            args.datapath, log, args.split_file)
+        TrainImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
+        TestImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
+            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+            
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
     for key, value in sorted(vars(args).items()):
@@ -127,7 +140,7 @@ def main():
             'optimizer': optimizer.state_dict(),
         }, savefilename)
 
-        if epoch % 1 ==0:
+        if epoch % 5 ==0:
             test(TestImgLoader, model, log)
 
     test(TestImgLoader, model, log)
@@ -175,7 +188,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
         for idx in range(num_out):
             losses[idx].update(loss[idx].item())
 
-        if batch_idx % args.print_freq:
+        if (batch_idx % args.print_freq) == 0:
             info_str = ['Stage {} = {:.2f}({:.2f})'.format(x, losses[x].val, losses[x].avg) for x in range(num_out)]
             info_str = '\t'.join(info_str)
 

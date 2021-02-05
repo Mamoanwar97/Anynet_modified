@@ -45,7 +45,7 @@ parser.add_argument('--growth_rate', type=int, nargs='+', default=[4,1,1], help=
 parser.add_argument('--spn_init_channels', type=int, default=8, help='initial channels for spnet')
 parser.add_argument('--train_file', type=str, default=None)
 parser.add_argument('--validation_file', type=str, default=None)
-
+parser.add_argument('--load_npy', action='store_true')
 args = parser.parse_args()
 
 
@@ -53,14 +53,14 @@ def main():
     global args
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(
-        args.datapath, args.train_file, args.validation_file)
+        args.datapath, args.train_file, args.validation_file, args.load_npy)
 
     TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True, load_npy=args.load_npy),
         batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
     TestImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
+        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, load_npy=args.load_npy),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
 
     if not os.path.isdir(args.save_path):
