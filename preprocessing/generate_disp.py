@@ -72,4 +72,4 @@ if __name__ == '__main__':
         # disp_map = (disp_map*256).astype(np.uint8)
         # saved = Image.fromarray(disp_map)
         # saved.save(disparity_dir + '/' + predix + '.png')
-        # print('Finish Disparity {}'.format(predix))
+        print('Finish Disparity {}'.format(predix))
