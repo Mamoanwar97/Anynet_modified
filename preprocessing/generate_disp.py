@@ -8,7 +8,6 @@ import cv2
 from PIL import Image
 import kitti_util
 
-
 def generate_dispariy_from_velo(pc_velo, height, width, calib):
     pts_2d = calib.project_velo_to_image(pc_velo)
     fov_inds = (pts_2d[:, 0] < width - 1) & (pts_2d[:, 0] >= 0) & \
@@ -23,7 +22,6 @@ def generate_dispariy_from_velo(pc_velo, height, width, calib):
         depth = imgfov_pc_rect[i, 2]
         depth_map[int(imgfov_pts_2d[i, 1]), int(imgfov_pts_2d[i, 0])] = depth
     baseline = 0.54
-
     disp_map = (calib.f_u * baseline) / depth_map
     return disp_map
 
@@ -69,11 +67,9 @@ if __name__ == '__main__':
         disp_map = generate_dispariy_from_velo(lidar, height, width, calib)
         np.save(disparity_npy_dir + '/' + predix, disp_map)
 
-        # if np.min(disp_map) < 0 :
-        #     disp_map = (disp_map - np.min(disp_map))
-        disp_map = np.clip(disp_map, 0, 2**16)
-        disp_map = (disp_map - np.min(disp_map)) / (np.max(disp_map) - np.min(disp_map))
-        disp_map = (disp_map*256).astype(np.uint8)
-        saved = Image.fromarray(disp_map)
-        saved.save(disparity_dir + '/' + predix + '.png')
-        print('Finish Disparity {}'.format(predix))
+        # disp_map = np.clip(disp_map, 0, 2**16)
+        # disp_map = (disp_map - np.min(disp_map)) / (np.max(disp_map) - np.min(disp_map))
+        # disp_map = (disp_map*256).astype(np.uint8)
+        # saved = Image.fromarray(disp_map)
+        # saved.save(disparity_dir + '/' + predix + '.png')
+        # print('Finish Disparity {}'.format(predix))
