@@ -52,15 +52,11 @@ def dataloader(filepath, train_spit=None, val_list=None, load_npy=False):
 def testloader(filepath):
     left_fold = 'image_2/'
     right_fold = 'image_3/'
-    disp_L = 'disp_occ_0/'
 
-    # all_index = np.arange(4)
-    # np.random.shuffle(all_index)
-    disp_files = [x for x in os.listdir(os.path.join(filepath, 'training', disp_L))]
-    val = disp_files[:10]
+    test_files = [x for x in os.listdir(os.path.join(filepath, 'training', right_fold))]
+    val = test_files[:10]
 
     # val = [x for x in os.listdir(os.path.join(filepath, 'validation', left_fold)) if is_image_file(x)]
     left_val = [os.path.join(filepath, 'training', left_fold, img) for img in val]
     right_val = [os.path.join(filepath, 'training', right_fold, img) for img in val]
-    left_val_disp = [os.path.join(filepath, 'training', disp_L, img) for img in val]
-    return left_val, right_val, left_val_disp
+    return left_val, right_val
