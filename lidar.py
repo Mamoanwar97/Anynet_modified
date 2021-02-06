@@ -29,6 +29,7 @@ parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--split_file', type=str, default=None)
 parser.add_argument('--pretrained', type=str, default=None, help='pretrained model path')
 parser.add_argument('--save_path', type=str, default='results/pseudoLidar/', help='the path of saving checkpoints and log')
+parser.add_argument('--limit', type=int, default=10)
 
 """ LiDAR args """
 parser.add_argument('--max_high', type=int, default=1)
@@ -57,7 +58,7 @@ args = parser.parse_args()
 def main():
     global args
 
-    test_left_img, test_right_img = ls.testloader(args.datapath)
+    test_left_img, test_right_img = ls.testloader(args.datapath, limit=args.limit, split_file=args.split_file)
 
     TestImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(test_left_img, test_right_img, test_left_img, False, evaluating=True), 
@@ -136,7 +137,8 @@ def evaluate(dataloader, model):
     model.eval()
     times = 0
 
-    for i, (imgL, imgR) in enumerate(dataloader):
+    # for i, (imgL, imgR) in enumerate(dataloader):
+    for i, (imgL, imgR) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Preparing Examples", total=(len(dataloader)), unit='Example'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         with torch.no_grad():
@@ -150,14 +152,6 @@ def evaluate(dataloader, model):
     Average_FPS =   (len(all_outputs) - 1) / times
     print('\nAverage Time: {:.2f} ms ~ {:.2f} FPS\n'.format(Average_time, Average_FPS))
     return all_outputs
-
-def error_estimating(disp, ground_truth, maxdisp=192):
-    gt = ground_truth
-    mask = gt > 0
-    mask = mask * (gt < maxdisp)
-    errmap = torch.abs(disp - gt)
-    err3 = ((errmap[mask] > 3.) & (errmap[mask] / gt[mask] > 0.05)).sum()
-    return err3.float() / mask.sum().float()
 
 if __name__ == '__main__':
     main()

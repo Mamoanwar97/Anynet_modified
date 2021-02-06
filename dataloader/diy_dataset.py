@@ -49,14 +49,19 @@ def dataloader(filepath, train_spit=None, val_list=None, load_npy=False):
 
     return left_train, right_train, left_train_disp, left_val, right_val, left_val_disp
 
-def testloader(filepath):
+def testloader(filepath, limit=-1, split_file=None):
     left_fold = 'image_2/'
     right_fold = 'image_3/'
 
-    test_files = [x for x in os.listdir(os.path.join(filepath, 'training', right_fold))]
-    val = test_files[:10]
+    if not split_file is None:
+        with open(split_file) as f:
+            test_files = ([(str(x.strip())+'.png') for x in f.readlines() if len(x) > 0])
+    else:
+        test_files = [x for x in os.listdir(os.path.join(filepath, 'training', right_fold))]
 
-    # val = [x for x in os.listdir(os.path.join(filepath, 'validation', left_fold)) if is_image_file(x)]
-    left_val = [os.path.join(filepath, 'training', left_fold, img) for img in val]
-    right_val = [os.path.join(filepath, 'training', right_fold, img) for img in val]
+    if not limit == -1:
+        test_files = test_files[:limit]
+
+    left_val = [os.path.join(filepath, 'training', left_fold, img) for img in test_files]
+    right_val = [os.path.join(filepath, 'training', right_fold, img) for img in test_files]
     return left_val, right_val
