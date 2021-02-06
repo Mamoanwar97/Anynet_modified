@@ -1,10 +1,7 @@
-import argparse
-import os
-import sys
 import numpy as np
 import skimage
 import skimage.io
-import scipy.misc as ssc
+
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -12,19 +9,22 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 from torchvision.utils import save_image
-import time
-import utils.logger as logger
 import torch.backends.cudnn as cudnn
-from preprocessing.generate_lidar import project_disp_to_points, Calibration
-from preprocessing.kitti_sparsify import pto_ang_map
+
 from dataloader import KITTILoader as DA
 from dataloader import diy_dataset as ls
+from preprocessing.kitti_util import Calibration
+from preprocessing.generate_lidar import project_disp_to_points, Calibration
+from preprocessing.kitti_sparsify import pto_ang_map
+
+import argparse
+from models.anynet import AnyNet
+import time
+import os
+import sys
 import tqdm
 
-import models.anynet
-
 parser = argparse.ArgumentParser(description='Evaluating Anynet')
-
 parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--split_file', type=str, default=None)
 parser.add_argument('--pretrained', type=str, default=None, help='pretrained model path')
@@ -59,12 +59,15 @@ def main():
 
     test_left_img, test_right_img = ls.testloader(args.datapath)
 
-    TestImgLoader = torch.utils.data.DataLoader(DA.myImageFloder(test_left_img, test_right_img, test_left_img, False, evaluating=True), batch_size=1, shuffle=False, num_workers=4, drop_last=False)
+    TestImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(test_left_img, test_right_img, test_left_img, False, evaluating=True), 
+        batch_size=1, shuffle=False, num_workers=4, drop_last=False
+    )
 
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
 
-    model = models.anynet.AnyNet(args)
+    model = AnyNet(args)
     model = nn.DataParallel(model).cuda()
 
     if args.pretrained:
@@ -79,53 +82,53 @@ def main():
     cudnn.benchmark = True
     all_outputs = evaluate(TestImgLoader, model)
 
-    for i, single_batch in tqdm.tqdm(enumerate(all_outputs), ascii=True, desc="Generating Results", total=(len(all_outputs)), unit='Example'):
-        for j, stage in enumerate(single_batch):
-            output = torch.squeeze(stage, 1)
-            img_cpu = np.asarray(output.cpu())
-            disp_map = img_cpu[0, :, :]
-            if j % 4 == 3:
-                predix = str(i).zfill(6)
+    for i, stages in tqdm.tqdm(enumerate(all_outputs), ascii=True, desc="Generating Results", total=(len(all_outputs)), unit='Example'):
 
-                """ Disparity png Generation """
-                disp_images_path = args.save_path + 'disparity/'
-                if not os.path.isdir(disp_images_path):
-                    os.makedirs(disp_images_path)
-                skimage.io.imsave(disp_images_path  + predix + '.png', (disp_map*256).astype('uint16'))
+        output = torch.squeeze(stages[3], 1)
+        img_cpu = np.asarray(output.cpu())
+        disp_map = img_cpu[0, :, :]
 
-                """ Disparity npy Generation """
-                disp_npy_path = args.save_path + 'npy/'
-                if not os.path.isdir(disp_npy_path):
-                    os.makedirs(disp_npy_path)
-                np.save(disp_npy_path + predix, disp_map)
+        predix = str(i).zfill(6)
 
-                if args.generate_lidar:
-                    """ LiDAR Generation """
-                    point_cloud_path = args.save_path + 'point_cloud'
-                    if not os.path.isdir(point_cloud_path):
-                        os.makedirs(point_cloud_path)
-                    calib_file = '{}/{}.txt'.format(args.datapath + '/training/calib', predix)
-                    calib = Calibration(calib_file)
-                    lidar = project_disp_to_points(calib, disp_map, args.max_high)
-                    lidar = np.concatenate([lidar, np.ones((lidar.shape[0], 1))], 1)
-                    lidar = lidar.astype(np.float32)
-                    lidar.tofile('{}/{}.bin'.format(point_cloud_path, predix))
-                    
-                    """ Sparse LiDAR Generation """
-                    sparse_point_cloud_path = args.save_path + 'sparse_point_cloud'
-                    if not os.path.isdir(sparse_point_cloud_path):
-                        os.makedirs(sparse_point_cloud_path)
-                    pc_velo = lidar.reshape((-1, 4))
-                    valid_inds =    (pc_velo[:, 0] < 120)    & \
-                                    (pc_velo[:, 0] >= 0)     & \
-                                    (pc_velo[:, 1] < 50)     & \
-                                    (pc_velo[:, 1] >= -50)   & \
-                                    (pc_velo[:, 2] < 1.5)    & \
-                                    (pc_velo[:, 2] >= -2.5)
-                    pc_velo = pc_velo[valid_inds]
-                    sparse_points = pto_ang_map(pc_velo, H=args.H, W=args.W, slice=args.slice)
-                    sparse_points = sparse_points.astype(np.float32)
-                    sparse_points.tofile('{}/{}.bin'.format(sparse_point_cloud_path, predix))
+        """ Disparity png Generation """
+        disp_images_path = args.save_path + 'disparity/'
+        if not os.path.isdir(disp_images_path):
+            os.makedirs(disp_images_path)
+        skimage.io.imsave(disp_images_path  + predix + '.png', (disp_map*256).astype('uint16'))
+
+        """ Disparity npy Generation """
+        disp_npy_path = args.save_path + 'npy/'
+        if not os.path.isdir(disp_npy_path):
+            os.makedirs(disp_npy_path)
+        np.save(disp_npy_path + predix, disp_map)
+
+        if args.generate_lidar:
+            """ LiDAR Generation """
+            point_cloud_path = args.save_path + 'point_cloud'
+            if not os.path.isdir(point_cloud_path):
+                os.makedirs(point_cloud_path)
+            calib_file = '{}/{}.txt'.format(args.datapath + '/training/calib', predix)
+            calib = Calibration(calib_file)
+            lidar = project_disp_to_points(calib, disp_map, args.max_high)
+            lidar = np.concatenate([lidar, np.ones((lidar.shape[0], 1))], 1)
+            lidar = lidar.astype(np.float32)
+            lidar.tofile('{}/{}.bin'.format(point_cloud_path, predix))
+            
+            """ Sparse LiDAR Generation """
+            sparse_point_cloud_path = args.save_path + 'sparse_point_cloud'
+            if not os.path.isdir(sparse_point_cloud_path):
+                os.makedirs(sparse_point_cloud_path)
+            pc_velo = lidar.reshape((-1, 4))
+            valid_inds =    (pc_velo[:, 0] < 120)    & \
+                            (pc_velo[:, 0] >= 0)     & \
+                            (pc_velo[:, 1] < 50)     & \
+                            (pc_velo[:, 1] >= -50)   & \
+                            (pc_velo[:, 2] < 1.5)    & \
+                            (pc_velo[:, 2] >= -2.5)
+            pc_velo = pc_velo[valid_inds]
+            sparse_points = pto_ang_map(pc_velo, H=args.H, W=args.W, slice=args.slice)
+            sparse_points = sparse_points.astype(np.float32)
+            sparse_points.tofile('{}/{}.bin'.format(sparse_point_cloud_path, predix))
     return
 
 def evaluate(dataloader, model):
