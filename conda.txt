@@ -1,0 +1,38 @@
+1 - Make anaconda enviroment with python 3.6
+
+conda create --name anynet python=3.6
+
+2 - Navigate the enviroment
+
+conda activate anynet
+
+3 - Install pytorch 1.0 and cuda 10.0
+
+conda install pytorch==1.0.1 torchvision==0.2.2 cudatoolkit=10.0 -c pytorch
+
+4 - Navigate to models/spn_t1, try to run make.sh, through git cli
+
+sh make.sh
+
+if not success:
+
+5 - Install nvcc
+
+conda install -c conda-forge nvcc_linux-64
+
+test the existance of torch, nvcc and cuda:
+python -c "import torch; print(torch.__version__)"
+python -c "import torch;print(torch.version.cuda)"
+nvcc --version
+
+try to run make.sh
+
+if successed: return to anynet directory, but your installed dataset in folder: path-to-kitti2015
+
+python finetune.py --maxdisp 192 --with_spn --datapath path-to-kitti2012/training/ --save_path results/kitti2012 --datatype 2012 --pretrained checkpoint/kitti2015_ck/checkpoint.tar --split_file checkpoint/kitti2012_ck/split.txt --evaluate
+
+***************************************************************************************************************************************************************
+export PATH=/usr/local/cuda/bin:$PATH
+export CPATH=/usr/local/cuda/include:$CPATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
