@@ -12,6 +12,7 @@ import utils.logger as logger
 import torch.backends.cudnn as cudnn
 import numpy as np
 import models.anynet
+import tqdm
 
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
 parser.add_argument('--maxdisp', type=int, default=192,
@@ -22,9 +23,9 @@ parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
                     help='datapath')
 parser.add_argument('--datapath', default=None, help='datapath')
-parser.add_argument('--epochs', type=int, default=50,
+parser.add_argument('--epochs', type=int, default=100,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=16,
+parser.add_argument('--train_bsize', type=int, default=3,
                     help='batch size for training (default: 6)')
 parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
@@ -32,7 +33,7 @@ parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
 parser.add_argument('--resume', type=str, default=None,
                     help='resume path')
-parser.add_argument('--lr', type=float, default=5e-4,
+parser.add_argument('--lr', type=float, default=1e-5,
                     help='learning rate')
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
 parser.add_argument('--print_freq', type=int, default=25, help='print frequence')
@@ -112,6 +113,7 @@ def main():
         if os.path.isfile(args.resume):
             log.info("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
+            args.start_epoch = checkpoint['epoch'] + 35
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             log.info("=> loaded checkpoint '{}' (epoch {})"
@@ -128,7 +130,7 @@ def main():
         return
 
     for epoch in range(args.start_epoch, args.epochs):
-        log.info('This is {}-th epoch'.format(epoch))
+        # log.info('This is {}-th epoch'.format(epoch))
         adjust_learning_rate(optimizer, epoch)
 
         train(TrainImgLoader, model, optimizer, log, epoch)
@@ -140,7 +142,7 @@ def main():
             'optimizer': optimizer.state_dict(),
         }, savefilename)
 
-        if epoch % 5 ==0:
+        if epoch % 2 ==0:
             test(TestImgLoader, model, log)
 
     test(TestImgLoader, model, log)
@@ -155,7 +157,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
     flag = 0
     model.train()
 
-    for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc=("training epoch " + str(epoch)), total=(len(dataloader)), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -188,12 +190,12 @@ def train(dataloader, model, optimizer, log, epoch=0):
         for idx in range(num_out):
             losses[idx].update(loss[idx].item())
 
-        if (batch_idx % args.print_freq) == 0:
-            info_str = ['Stage {} = {:.2f}({:.2f})'.format(x, losses[x].val, losses[x].avg) for x in range(num_out)]
-            info_str = '\t'.join(info_str)
+        # if (batch_idx % args.print_freq) == 0:
+        #     info_str = ['Stage {} = {:.2f}({:.2f})'.format(x, losses[x].val, losses[x].avg) for x in range(num_out)]
+        #     info_str = '\t'.join(info_str)
 
-            log.info('Epoch{} [{}/{}] {}'.format(
-                epoch, batch_idx, length_loader, info_str))
+        #     log.info('Epoch{} [{}/{}] {}'.format(
+        #         epoch, batch_idx, length_loader, info_str))
     info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
     log.info('Average train loss = ' + info_str)
 
@@ -206,7 +208,7 @@ def test(dataloader, model, log):
 
     model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in enumerate(dataloader):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Testing", total=(len(dataloader)), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -217,10 +219,10 @@ def test(dataloader, model, log):
                 output = torch.squeeze(outputs[x], 1)
                 D1s[x].update(error_estimating(output, disp_L).item())
 
-        info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
+        # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
 
-        log.info('[{}/{}] {}'.format(
-            batch_idx, length_loader, info_str))
+        # log.info('[{}/{}] {}'.format(
+        #     batch_idx, length_loader, info_str))
 
     info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
     log.info('Average test 3-Pixel Error = ' + info_str)

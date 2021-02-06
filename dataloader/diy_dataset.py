@@ -23,7 +23,7 @@ def dataloader(filepath, train_spit=None, val_list=None, load_npy=False):
             trainlist = ([(str(x.strip())) for x in f.readlines() if len(x) > 0])
         train = trainlist
     else:
-        train = [x for x in os.listdir(os.path.join(filepath, 'training', left_fold)) if is_image_file(x)]
+        train = [x[:-4] for x in os.listdir(os.path.join(filepath, 'training', left_fold)) if is_image_file(x)]
     
     left_train = [os.path.join(filepath, 'training', left_fold, img + '.png') for img in train]
     right_train = [os.path.join(filepath, 'training', right_fold, img + '.png') for img in train]
@@ -38,7 +38,7 @@ def dataloader(filepath, train_spit=None, val_list=None, load_npy=False):
             vallist = ([(str(x.strip())) for x in f.readlines() if len(x) > 0])
         val = vallist[:1000]
     else:
-        val = [x for x in os.listdir(os.path.join(filepath, 'training', left_fold)) if is_image_file(x)]
+        val = [x[:-4] for x in os.listdir(os.path.join(filepath, 'training', left_fold)) if is_image_file(x)]
 
     left_val = [os.path.join(filepath, 'training', left_fold, img+ '.png') for img in val]
     right_val = [os.path.join(filepath, 'training', right_fold, img+ '.png') for img in val]
