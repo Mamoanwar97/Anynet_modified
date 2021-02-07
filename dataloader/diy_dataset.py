@@ -36,7 +36,7 @@ def dataloader(filepath, train_spit=None, val_list=None, load_npy=False):
     if not val_list is None:
         with open(val_list) as f:
             vallist = ([(str(x.strip())) for x in f.readlines() if len(x) > 0])
-        val = vallist[:1000]
+        val = vallist
     else:
         val = [x[:-4] for x in os.listdir(os.path.join(filepath, 'training', left_fold)) if is_image_file(x)]
 

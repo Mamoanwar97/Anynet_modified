@@ -20,4 +20,4 @@ python main.py --maxdisp 192 --with_spn --datapath path-to-kitti/ --train_file p
 
 python finetune.py --maxdisp 192 --with_spn --datapath path-to-kitti/ --pretrained checkpoint/kitti/sceneflow_ck_latest.tar --datatype other --train_file path-to-kitti/train.txt --validation_file path-to-kitti/val.txt --load_npy --resume checkpoint/kitti/sceneflow_ck_latest.tar
 
-python finetune.py --maxdisp 192 --with_spn --datapath path-to-kitti/ --pretrained checkpoint/kitti/sceneflow_ck_latest.tar --datatype other --train_file path-to-kitti/train.txt --validation_file path-to-kitti/val.txt --load_npy --resume checkpoint/kitti/sceneflow_ck_latest.tar
+python finetune.py --maxdisp 192 --with_spn --datapath path-to-kitti/ --pretrained checkpoint/kitti/sceneflow.tar --datatype other --train_file path-to-kitti/train.txt --validation_file path-to-kitti/val.txt --load_npy --resume checkpoint/kitti/sceneflow.tar

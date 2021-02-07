@@ -25,7 +25,7 @@ parser.add_argument('--datatype', default='2015',
 parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--epochs', type=int, default=100,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=3,
+parser.add_argument('--train_bsize', type=int, default=6,
                     help='batch size for training (default: 6)')
 parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
@@ -33,7 +33,7 @@ parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
 parser.add_argument('--resume', type=str, default=None,
                     help='resume path')
-parser.add_argument('--lr', type=float, default=1e-5,
+parser.add_argument('--lr', type=float, default=5e-6,
                     help='learning rate')
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
 parser.add_argument('--print_freq', type=int, default=25, help='print frequence')
@@ -113,7 +113,7 @@ def main():
         if os.path.isfile(args.resume):
             log.info("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
-            args.start_epoch = checkpoint['epoch'] + 35
+            args.start_epoch = checkpoint['epoch']
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             log.info("=> loaded checkpoint '{}' (epoch {})"
@@ -142,8 +142,7 @@ def main():
             'optimizer': optimizer.state_dict(),
         }, savefilename)
 
-        if epoch % 2 ==0:
-            test(TestImgLoader, model, log)
+        test(TestImgLoader, model, log, epoch)
 
     test(TestImgLoader, model, log)
     log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
@@ -157,7 +156,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
     flag = 0
     model.train()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc=("training epoch " + str(epoch)), total=(len(dataloader)), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc=("training epoch " + str(epoch)), total=(len(dataloader)), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -196,19 +195,24 @@ def train(dataloader, model, optimizer, log, epoch=0):
 
         #     log.info('Epoch{} [{}/{}] {}'.format(
         #         epoch, batch_idx, length_loader, info_str))
-    info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
-    log.info('Average train loss = ' + info_str)
+    # info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
+    # log.info('Average train loss = ' + info_str)
 
 
-def test(dataloader, model, log):
+def test(dataloader, model, log, epoch=-1):
 
     stages = 3 + args.with_spn
     D1s = [AverageMeter() for _ in range(stages)]
     length_loader = len(dataloader)
-
+    Error = {
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [],
+    }
     model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Testing", total=(len(dataloader)), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc="Testing", total=(len(dataloader)), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -218,14 +222,18 @@ def test(dataloader, model, log):
             for x in range(stages):
                 output = torch.squeeze(outputs[x], 1)
                 D1s[x].update(error_estimating(output, disp_L).item())
-
+                Error[str(x)].append(D1s[x].val)
         # info_str = '\t'.join(['Stage {} = {:.4f}({:.4f})'.format(x, D1s[x].val, D1s[x].avg) for x in range(stages)])
-
         # log.info('[{}/{}] {}'.format(
         #     batch_idx, length_loader, info_str))
 
-    info_str = ', '.join(['Stage {}={:.4f}'.format(x, D1s[x].avg) for x in range(stages)])
-    log.info('Average test 3-Pixel Error = ' + info_str)
+    info_str = ', '.join(['Stage {}={:.4f}%'.format(x, D1s[x].avg * 100) for x in range(stages)])
+    Error3 = np.asarray(Error["3"], dtype=np.float32)
+    log.info("Max Error is {}, while Min Error is {}".format(np.max(Error3), np.min(Error3)))
+    if epoch > -1:
+        log.info('Average test 3-Pixel Error at Epoch {} = '.format(epoch) + info_str)
+    else:
+        log.info('Average test 3-Pixel Error = ' + info_str)
 
 
 def error_estimating(disp, ground_truth, maxdisp=192):
@@ -238,9 +246,9 @@ def error_estimating(disp, ground_truth, maxdisp=192):
     return err3.float() / mask.sum().float()
 
 def adjust_learning_rate(optimizer, epoch):
-    if epoch <= 200:
+    if epoch <= 80:
         lr = args.lr
-    elif epoch <= 400:
+    elif epoch <= 90:
         lr = args.lr * 0.1
     else:
         lr = args.lr * 0.01
