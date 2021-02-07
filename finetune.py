@@ -103,8 +103,7 @@ def main():
         if os.path.isfile(args.pretrained):
             checkpoint = torch.load(args.pretrained)
             model.load_state_dict(checkpoint['state_dict'], strict=False)
-            log.info("=> loaded pretrained model '{}'"
-                     .format(args.pretrained))
+            log.info("=> loaded pretrained model '{}'".format(args.pretrained))
         else:
             log.info("=> no pretrained model found at '{}'".format(args.pretrained))
             log.info("=> Will start from scratch.")
@@ -113,16 +112,14 @@ def main():
         if os.path.isfile(args.resume):
             log.info("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
-            args.start_epoch = checkpoint['epoch']
+            args.start_epoch = checkpoint['epoch'] + 1
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            log.info("=> loaded checkpoint '{}' (epoch {})"
-                     .format(args.resume, checkpoint['epoch']))
+            log.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             log.info("=> no checkpoint found at '{}'".format(args.resume))
             log.info("=> Will start from scratch.")
-    else:
-        log.info('Not Resume')
+
     cudnn.benchmark = True
     start_full_time = time.time()
     if args.evaluate:
@@ -153,10 +150,9 @@ def train(dataloader, model, optimizer, log, epoch=0):
     stages = 3 + args.with_spn
     losses = [AverageMeter() for _ in range(stages)]
     length_loader = len(dataloader)
-    flag = 0
     model.train()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc=("training epoch " + str(epoch)), total=(len(dataloader)), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc=("training epoch " + str(epoch)), total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -176,11 +172,6 @@ def train(dataloader, model, optimizer, log, epoch=0):
 
         outputs = [torch.squeeze(output, 1) for output in outputs]
 
-        # if flag == 0:
-        #     printing = outputs[0]
-        #     print(printing)
-        #     flag = 1
-
         loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)
                 for x in range(num_out)]
         sum(loss).backward()
@@ -188,13 +179,12 @@ def train(dataloader, model, optimizer, log, epoch=0):
 
         for idx in range(num_out):
             losses[idx].update(loss[idx].item())
-
         # if (batch_idx % args.print_freq) == 0:
         #     info_str = ['Stage {} = {:.2f}({:.2f})'.format(x, losses[x].val, losses[x].avg) for x in range(num_out)]
         #     info_str = '\t'.join(info_str)
-
         #     log.info('Epoch{} [{}/{}] {}'.format(
         #         epoch, batch_idx, length_loader, info_str))
+
     # info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
     # log.info('Average train loss = ' + info_str)
 
@@ -212,7 +202,7 @@ def test(dataloader, model, log, epoch=-1):
     }
     model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc="Testing", total=(len(dataloader)), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc="Testing", total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
