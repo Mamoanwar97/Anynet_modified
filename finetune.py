@@ -7,7 +7,6 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 import time
-from dataloader import KITTILoader as DA
 import utils.logger as logger
 import torch.backends.cudnn as cudnn
 import numpy as np
@@ -23,9 +22,9 @@ parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
                     help='datapath')
 parser.add_argument('--datapath', default=None, help='datapath')
-parser.add_argument('--epochs', type=int, default=100,
+parser.add_argument('--epochs', type=int, default=110,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=6,
+parser.add_argument('--train_bsize', type=int, default=64,
                     help='batch size for training (default: 6)')
 parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
@@ -33,7 +32,7 @@ parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
 parser.add_argument('--resume', type=str, default=None,
                     help='resume path')
-parser.add_argument('--lr', type=float, default=5e-6,
+parser.add_argument('--lr', type=float, default=5e-10,
                     help='learning rate')
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
 parser.add_argument('--print_freq', type=int, default=25, help='print frequence')
@@ -43,7 +42,7 @@ parser.add_argument('--channels_3d', type=int, default=4, help='number of initia
 parser.add_argument('--layers_3d', type=int, default=4, help='number of initial layers in 3d network')
 parser.add_argument('--growth_rate', type=int, nargs='+', default=[4,1,1], help='growth rate in the 3d network')
 parser.add_argument('--spn_init_channels', type=int, default=8, help='initial channels for spnet')
-parser.add_argument('--start_epoch_for_spn', type=int, default=0)
+parser.add_argument('--start_epoch_for_spn', type=int, default=93)
 parser.add_argument('--pretrained', type=str, default='results/pretrained_anynet/checkpoint.tar',
                     help='pretrained model path')
 parser.add_argument('--train_file', type=str, default=None)
@@ -52,16 +51,17 @@ parser.add_argument('--load_npy', action='store_true')
 parser.add_argument('--evaluate', action='store_true')
 parser.add_argument('--split_file', type=str, default=None)
 
-
 args = parser.parse_args()
 
 if args.datatype == '2015':
     from dataloader import KITTIloader2015 as ls
+    from dataloader import KITTILoader as DA
 elif args.datatype == '2012':
     from dataloader import KITTIloader2012 as ls
+    from dataloader import KITTILoader as DA
 elif args.datatype == 'other':
-    from dataloader import diy_dataset as ls
-
+    from dataloader import KITTI_dataset as ls
+    from dataloader import KITTILoader3D as DA
 
 def main():
     global args
@@ -69,28 +69,22 @@ def main():
 
     if args.datatype == 'other':
         train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
-            args.datapath, args.train_file, args.validation_file, args.load_npy)
-
-        TrainImgLoader = torch.utils.data.DataLoader(
-            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True, load_npy=args.load_npy),
-            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
-
-        TestImgLoader = torch.utils.data.DataLoader(
-            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, load_npy=args.load_npy),
-            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+            args.datapath, args.train_file, args.validation_file)
     else:
         train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
             args.datapath, log, args.split_file)
-        TrainImgLoader = torch.utils.data.DataLoader(
-            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
-            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+    
+    TrainImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+        batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
-        TestImgLoader = torch.utils.data.DataLoader(
-            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
-            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
-            
+    TestImgLoader = torch.utils.data.DataLoader(
+        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
+        batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+    
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
+
     for key, value in sorted(vars(args).items()):
         log.info(str(key) + ': ' + str(value))
 
@@ -99,15 +93,8 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
     log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
-    if args.pretrained:
-        if os.path.isfile(args.pretrained):
-            checkpoint = torch.load(args.pretrained)
-            model.load_state_dict(checkpoint['state_dict'], strict=False)
-            log.info("=> loaded pretrained model '{}'".format(args.pretrained))
-        else:
-            log.info("=> no pretrained model found at '{}'".format(args.pretrained))
-            log.info("=> Will start from scratch.")
     args.start_epoch = 0
+    cudnn.benchmark = True
     if args.resume:
         if os.path.isfile(args.resume):
             log.info("=> loading checkpoint '{}'".format(args.resume))
@@ -116,16 +103,26 @@ def main():
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             log.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+            test(TestImgLoader, model, log, checkpoint['epoch'])
         else:
             log.info("=> no checkpoint found at '{}'".format(args.resume))
             log.info("=> Will start from scratch.")
+    elif args.pretrained:
+        if os.path.isfile(args.pretrained):
+            checkpoint = torch.load(args.pretrained)
+            model.load_state_dict(checkpoint['state_dict'], strict=False)
+            log.info("=> loaded pretrained model '{}'".format(args.pretrained))
+        else:
+            log.info("=> no pretrained model found at '{}'".format(
+                args.pretrained))
+            log.info("=> Will start from scratch.")
+    else:
+        log.info("=> Will start from scratch.")
 
-    cudnn.benchmark = True
     start_full_time = time.time()
     if args.evaluate:
         test(TestImgLoader, model, log)
         return
-
     for epoch in range(args.start_epoch, args.epochs):
         # log.info('This is {}-th epoch'.format(epoch))
         adjust_learning_rate(optimizer, epoch)
@@ -138,7 +135,7 @@ def main():
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, savefilename)
-
+        # if (epoch % 3):
         test(TestImgLoader, model, log, epoch)
 
     test(TestImgLoader, model, log)
@@ -152,7 +149,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
     length_loader = len(dataloader)
     model.train()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc=("training epoch " + str(epoch)), total=(length_loader), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc=("training epoch " + str(epoch)), total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -185,8 +182,8 @@ def train(dataloader, model, optimizer, log, epoch=0):
         #     log.info('Epoch{} [{}/{}] {}'.format(
         #         epoch, batch_idx, length_loader, info_str))
 
-    # info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
-    # log.info('Average train loss = ' + info_str)
+    info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
+    log.info('Average train loss at {}: '.format(epoch) + info_str)
 
 
 def test(dataloader, model, log, epoch=-1):
@@ -202,7 +199,7 @@ def test(dataloader, model, log, epoch=-1):
     }
     model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True,  desc="Testing", total=(length_loader), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Testing", total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
@@ -217,13 +214,13 @@ def test(dataloader, model, log, epoch=-1):
         # log.info('[{}/{}] {}'.format(
         #     batch_idx, length_loader, info_str))
 
-    info_str = ', '.join(['Stage {}={:.4f}%'.format(x, D1s[x].avg * 100) for x in range(stages)])
+    info_str = ', '.join(['Stage {}={:.3f}%'.format(x, D1s[x].avg * 100) for x in range(stages)])
     Error3 = np.asarray(Error["3"], dtype=np.float32)
     log.info("Max Error is {}, while Min Error is {}".format(np.max(Error3), np.min(Error3)))
     if epoch > -1:
-        log.info('Average test 3-Pixel Error at Epoch {} = '.format(epoch) + info_str)
+        log.info('Average test 3-Pixel Error at Epoch {}: '.format(epoch) + info_str)
     else:
-        log.info('Average test 3-Pixel Error = ' + info_str)
+        log.info('Average test 3-Pixel Error: ' + info_str)
 
 
 def error_estimating(disp, ground_truth, maxdisp=192):
@@ -236,9 +233,9 @@ def error_estimating(disp, ground_truth, maxdisp=192):
     return err3.float() / mask.sum().float()
 
 def adjust_learning_rate(optimizer, epoch):
-    if epoch <= 80:
+    if epoch <= 70:
         lr = args.lr
-    elif epoch <= 90:
+    elif epoch <= 85:
         lr = args.lr * 0.1
     else:
         lr = args.lr * 0.01

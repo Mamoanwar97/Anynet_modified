@@ -7,15 +7,15 @@ import torch.optim as optim
 import torch.utils.data
 import torch.nn.functional as F
 import time
+
 # from dataloader import listflowfile as lt
 # from dataloader import SecenFlowLoader as DA
-from dataloader import KITTILoader as DA
-from dataloader import diy_dataset as lt
+
+from dataloader import KITTI_dataset as lt
+from dataloader import KITTILoader3D as DA
+
 import utils.logger as logger
-
 import models.anynet
-
-# python finetune.py --maxdisp 192 --with_spn --datapath path-to-kitti2012/training/ --save_path results/kitti2012 --datatype 2012 --pretrained checkpoint/kitti2012_ck/checkpoint.tar --split_file checkpoint/kitti2012_ck/split.txt --evaluate
 
 parser = argparse.ArgumentParser(description='AnyNet with Flyingthings3d')
 parser.add_argument('--maxdisp', type=int, default=192, help='maxium disparity')
@@ -53,14 +53,14 @@ def main():
     global args
 
     train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(
-        args.datapath, args.train_file, args.validation_file, args.load_npy)
+        args.datapath, args.train_file, args.validation_file)
 
     TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True, load_npy=args.load_npy),
+        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
         batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
     TestImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False, load_npy=args.load_npy),
+        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
         batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
 
     if not os.path.isdir(args.save_path):
@@ -83,8 +83,7 @@ def main():
             args.start_epoch = checkpoint['epoch'] + 1
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            log.info("=> loaded checkpoint '{}' (epoch {})"
-                     .format(args.resume, checkpoint['epoch']))
+            log.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
         else:
             log.info("=> no checkpoint found at '{}'".format(args.resume))
             log.info("=> Will start from scratch.")
@@ -103,8 +102,6 @@ def main():
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, savefilename)
-
-        test(TestImgLoader, model, log)
 
     test(TestImgLoader, model, log)
     log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
