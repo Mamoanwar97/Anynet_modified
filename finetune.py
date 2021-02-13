@@ -16,7 +16,7 @@ import tqdm
 parser = argparse.ArgumentParser(description='Anynet fintune on KITTI')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maxium disparity')
-parser.add_argument('--loss_weights', type=float, nargs='+', default=[0.25, 0.5, 1., 1.])
+parser.add_argument('--loss_weights', type=float, nargs='+', default=[0.5, 0.7, 1, 1])
 parser.add_argument('--max_disparity', type=int, default=192)
 parser.add_argument('--maxdisplist', type=int, nargs='+', default=[12, 3, 3])
 parser.add_argument('--datatype', default='2015',
@@ -24,7 +24,7 @@ parser.add_argument('--datatype', default='2015',
 parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--epochs', type=int, default=110,
                     help='number of epochs to train')
-parser.add_argument('--train_bsize', type=int, default=64,
+parser.add_argument('--train_bsize', type=int, default=16,
                     help='batch size for training (default: 6)')
 parser.add_argument('--test_bsize', type=int, default=32,
                     help='batch size for testing (default: 8)')
@@ -32,8 +32,8 @@ parser.add_argument('--save_path', type=str, default='results/finetune_anynet',
                     help='the path of saving checkpoints and log')
 parser.add_argument('--resume', type=str, default=None,
                     help='resume path')
-parser.add_argument('--lr', type=float, default=5e-10,
-                    help='learning rate')
+parser.add_argument('--lr', type=float, default=1e-4,
+                    help='learning rate')   
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
 parser.add_argument('--print_freq', type=int, default=25, help='print frequence')
 parser.add_argument('--init_channels', type=int, default=1, help='initial channels for 2d feature extractor')
@@ -42,7 +42,7 @@ parser.add_argument('--channels_3d', type=int, default=4, help='number of initia
 parser.add_argument('--layers_3d', type=int, default=4, help='number of initial layers in 3d network')
 parser.add_argument('--growth_rate', type=int, nargs='+', default=[4,1,1], help='growth rate in the 3d network')
 parser.add_argument('--spn_init_channels', type=int, default=8, help='initial channels for spnet')
-parser.add_argument('--start_epoch_for_spn', type=int, default=93)
+parser.add_argument('--start_epoch_for_spn', type=int, default=5)
 parser.add_argument('--pretrained', type=str, default='results/pretrained_anynet/checkpoint.tar',
                     help='pretrained model path')
 parser.add_argument('--train_file', type=str, default=None)
@@ -73,7 +73,7 @@ def main():
     else:
         train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
             args.datapath, log, args.split_file)
-    
+
     TrainImgLoader = torch.utils.data.DataLoader(
         DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
         batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
@@ -103,7 +103,7 @@ def main():
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             log.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
-            test(TestImgLoader, model, log, checkpoint['epoch'])
+            # test(TestImgLoader, model, log, checkpoint['epoch'])
         else:
             log.info("=> no checkpoint found at '{}'".format(args.resume))
             log.info("=> Will start from scratch.")
@@ -135,7 +135,8 @@ def main():
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, savefilename)
-        # if (epoch % 3):
+
+        # if epoch > 10 and (epoch % 3):
         test(TestImgLoader, model, log, epoch)
 
     test(TestImgLoader, model, log)
@@ -169,7 +170,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
 
         outputs = [torch.squeeze(output, 1) for output in outputs]
 
-        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)
+        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], reduction='mean')
                 for x in range(num_out)]
         sum(loss).backward()
         optimizer.step()
@@ -182,7 +183,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
         #     log.info('Epoch{} [{}/{}] {}'.format(
         #         epoch, batch_idx, length_loader, info_str))
 
-    info_str = '\t'.join(['Stage {} = {:.2f}'.format(x, losses[x].avg) for x in range(stages)])
+    info_str = '\t'.join(['Stage {} = {:.4f}'.format(x, losses[x].avg) for x in range(stages)])
     log.info('Average train loss at {}: '.format(epoch) + info_str)
 
 
@@ -233,9 +234,9 @@ def error_estimating(disp, ground_truth, maxdisp=192):
     return err3.float() / mask.sum().float()
 
 def adjust_learning_rate(optimizer, epoch):
-    if epoch <= 70:
+    if epoch <= 110:
         lr = args.lr
-    elif epoch <= 85:
+    elif epoch <= 150:
         lr = args.lr * 0.1
     else:
         lr = args.lr * 0.01

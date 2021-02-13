@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(description='Evaluating Anynet')
 parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--pretrained', type=str, default=None, help='pretrained model path')
 parser.add_argument('--split_file', type=str, default=None)
-parser.add_argument('--save_path', type=str, default='results/pseudoLidar_test/', help='the path of saving checkpoints and log')
+parser.add_argument('--save_path', type=str, default='results/pseudoLidar_test1/', help='the path of saving checkpoints and log')
 
 """ OPTIONS """
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')

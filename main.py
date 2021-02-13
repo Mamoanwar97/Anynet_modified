@@ -72,7 +72,7 @@ def main():
 
     model = models.anynet.AnyNet(args)
     model = nn.DataParallel(model).cuda()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-4)
     log.info('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
 
     args.start_epoch = 0
@@ -128,7 +128,8 @@ def train(dataloader, model, optimizer, log, epoch=0):
         outputs = model(imgL, imgR)
         # print(outputs[0].shape)
         outputs = [torch.squeeze(output, 1) for output in outputs]
-        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], size_average=True)for x in range(stages)]
+        
+        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], reduction='mean')for x in range(stages)]
         sum(loss).backward()
         optimizer.step()
 
