@@ -83,32 +83,37 @@ def main():
             sys.exit(0)
 
     cudnn.benchmark = True
-    all_outputs = evaluate(TestImgLoader, model)
+    evaluate(TestImgLoader, model)
 
-    pool = Pool(args.threads)
-    pbar = tqdm(total=(len(all_outputs)), desc="Generating Results", unit='Example')
-    def update(*a):
-        pbar.update()
+    # pool = Pool(args.threads)
+    # pbar = tqdm(total=(len(all_outputs)), desc="Generating Results", unit='Example')
+    # def update(*a):
+    #     pbar.update()
     
-    for i, image in enumerate(all_outputs):
-        pool.apply_async(sparse_and_save, args=(args, i, image), callback=update)
+    # for i, image in enumerate(all_outputs):
+    #     pool.apply_async(sparse_and_save, args=(args, i, image), callback=update)
 
-    pool.close()
-    pool.join()
-    pbar.clear(nolock=False)
-    pbar.close()
+    # pool.close()
+    # pool.join()
+    # pbar.clear(nolock=False)
+    # pbar.close()
 
 def evaluate(dataloader, model):
-    all_outputs = []
+    total_time = 0
     model.eval()
-    for i, (imgL, imgR) in tqdm(enumerate(dataloader), desc="Preparing Examples", total=(len(dataloader)), unit='Example'):
+    for i, (imgL, imgR) in tqdm(enumerate(dataloader), desc="Generating Examples", total=(len(dataloader)), unit='Example'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         with torch.no_grad():
+            start_time = time.time()
             outputs = model(imgL, imgR)
-            all_outputs.append(torch.squeeze(outputs[3], 1).cpu())
-    return all_outputs
-
+            output3 = torch.squeeze(outputs[3], 1)
+            sparse_and_save(args, i, output3.cpu())
+            if i > 0:
+                total_time = total_time + (time.time() - start_time)
+            print("Time:    {} ms".format((time.time() - start_time)*1000))
+    print("Average Time:    {} ms   ~   {} FPS".format((total_time * 1000)/(len(dataloader) - 1), (len(dataloader) - 1)/total_time))
+    return
 
 def sparse_and_save(args, i, image):
     img_cpu = np.asarray(image)
