@@ -64,7 +64,6 @@ class myImageFloder(data.Dataset):
 
             left_img = left_img.crop((w - 1200, h - 352, w, h))
             right_img = right_img.crop((w - 1200, h - 352, w, h))
-            w1, h1 = left_img.size
 
             dataL = np.ascontiguousarray(dataL, dtype=np.float32)/256
 
