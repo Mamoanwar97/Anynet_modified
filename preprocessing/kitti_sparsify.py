@@ -1,7 +1,7 @@
 import argparse
 import os
 
-import numpy as np
+import cupy as cp
 import tqdm
 
 
@@ -28,7 +28,7 @@ def pto_rec_map(velo_points, H=64, W=512, D=800):
     z_grid[z_grid < 0] = 0
     z_grid[z_grid >= H] = H - 1
 
-    depth_map = - np.ones((D, W, H, 4))
+    depth_map = - cp.ones((D, W, H, 4))
     depth_map[x_grid, y_grid, z_grid, 0] = x
     depth_map[x_grid, y_grid, z_grid, 1] = y
     depth_map[x_grid, y_grid, z_grid, 2] = z
@@ -45,26 +45,26 @@ def pto_ang_map(velo_points, H=64, W=512, slice=1):
     :param slice: output every slice lines
     """
 
-    dtheta = np.radians(0.4 * 64.0 / H)
-    dphi = np.radians(90.0 / W)
+    dtheta = cp.radians(0.4 * 64.0 / H)
+    dphi = cp.radians(90.0 / W)
 
     x, y, z, i = velo_points[:, 0], velo_points[:, 1], velo_points[:, 2], velo_points[:, 3]
 
-    d = np.sqrt(x ** 2 + y ** 2 + z ** 2)
-    r = np.sqrt(x ** 2 + y ** 2)
+    d = cp.sqrt(x ** 2 + y ** 2 + z ** 2)
+    r = cp.sqrt(x ** 2 + y ** 2)
     d[d == 0] = 0.000001
     r[r == 0] = 0.000001
-    phi = np.radians(45.) - np.arcsin(y / r)
+    phi = cp.radians(45.) - cp.arcsin(y / r)
     phi_ = (phi / dphi).astype(int)
     phi_[phi_ < 0] = 0
     phi_[phi_ >= W] = W - 1
 
-    theta = np.radians(2.) - np.arcsin(z / d)
+    theta = cp.radians(2.) - cp.arcsin(z / d)
     theta_ = (theta / dtheta).astype(int)
     theta_[theta_ < 0] = 0
     theta_[theta_ >= H] = H - 1
 
-    depth_map = - np.ones((H, W, 4))
+    depth_map = - cp.ones((H, W, 4))
     depth_map[theta_, phi_, 0] = x
     depth_map[theta_, phi_, 1] = y
     depth_map[theta_, phi_, 2] = z
@@ -76,7 +76,7 @@ def pto_ang_map(velo_points, H=64, W=512, slice=1):
 
 
 def gen_sparse_points(pl_data_path, args):
-    pc_velo = np.fromfile(pl_data_path, dtype=np.float32).reshape((-1, 4))
+    pc_velo = cp.fromfile(pl_data_path, dtype=cp.float32).reshape((-1, 4))
 
     # depth, width, height
     valid_inds = (pc_velo[:, 0] < 120) & \
@@ -97,7 +97,7 @@ def gen_sparse_points_all(args):
 
     for data_idx in tqdm.tqdm(data_idx_list):
         sparse_points = gen_sparse_points(os.path.join(args.pl_path, data_idx), args)
-        sparse_points = sparse_points.astype(np.float32)
+        sparse_points = sparse_points.astype(cp.float32)
         sparse_points.tofile(f'{outputfolder}/{data_idx}')
 
 

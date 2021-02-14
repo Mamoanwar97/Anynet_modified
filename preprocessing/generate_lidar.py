@@ -1,7 +1,7 @@
 import argparse
 import os
 
-import numpy as np
+import cupy as cp
 import scipy.misc as ssc
 from .kitti_util import Calibration
 
@@ -9,9 +9,9 @@ def inverse_rigid_trans(Tr):
     ''' Inverse a rigid body transform matrix (3x4 as [R|t])
         [R'|-R't; 0|1]
     '''
-    inv_Tr = np.zeros_like(Tr)  # 3x4
-    inv_Tr[0:3, 0:3] = np.transpose(Tr[0:3, 0:3])
-    inv_Tr[0:3, 3] = np.dot(-np.transpose(Tr[0:3, 0:3]), Tr[0:3, 3])
+    inv_Tr = cp.zeros_like(Tr)  # 3x4
+    inv_Tr[0:3, 0:3] = cp.transpose(Tr[0:3, 0:3])
+    inv_Tr[0:3, 3] = cp.dot(-cp.transpose(Tr[0:3, 0:3]), Tr[0:3, 3])
     return inv_Tr
 
 def project_disp_to_points(calib, disp, max_high):
@@ -20,8 +20,8 @@ def project_disp_to_points(calib, disp, max_high):
     mask = disp > 0
     depth = calib.f_u * baseline / (disp + 1. - mask)
     rows, cols = depth.shape
-    c, r = np.meshgrid(np.arange(cols), np.arange(rows))
-    points = np.stack([c, r, depth])
+    c, r = cp.meshgrid(cp.arange(cols), cp.arange(rows))
+    points = cp.stack([c, r, depth])
     points = points.reshape((3, -1))
     points = points.T
     points = points[mask.reshape(-1)]
@@ -31,8 +31,8 @@ def project_disp_to_points(calib, disp, max_high):
 
 def project_depth_to_points(calib, depth, max_high):
     rows, cols = depth.shape
-    c, r = np.meshgrid(np.arange(cols), np.arange(rows))
-    points = np.stack([c, r, depth])
+    c, r = cp.meshgrid(cp.arange(cols), cp.arange(rows))
+    points = cp.stack([c, r, depth])
     points = points.reshape((3, -1))
     points = points.T
     cloud = calib.project_image_to_velo(points)
@@ -69,18 +69,18 @@ if __name__ == '__main__':
         if fn[-3:] == 'png':
             disp_map = ssc.imread(args.disparity_dir + '/' + fn)
         elif fn[-3:] == 'npy':
-            disp_map = np.load(args.disparity_dir + '/' + fn)
+            disp_map = cp.load(args.disparity_dir + '/' + fn)
         else:
             assert False
         if not args.is_depth:
-            disp_map = (disp_map*256).astype(np.uint16)/256.
-            # print(np.min(disp_map), np.max(disp_map))
+            disp_map = (disp_map*256).astype(cp.uint16)/256.
+            # print(cp.min(disp_map), cp.max(disp_map))
             lidar = project_disp_to_points(calib, disp_map, args.max_high)
         else:
-            disp_map = (disp_map).astype(np.float32)/256.
+            disp_map = (disp_map).astype(cp.float32)/256.
             lidar = project_depth_to_points(calib, disp_map, args.max_high)
         # pad 1 in the indensity dimension
-        lidar = np.concatenate([lidar, np.ones((lidar.shape[0], 1))], 1)
-        lidar = lidar.astype(np.float32)
+        lidar = cp.concatenate([lidar, cp.ones((lidar.shape[0], 1))], 1)
+        lidar = lidar.astype(cp.float32)
         lidar.tofile('{}/{}.bin'.format(args.save_dir, predix))
         print('Finish Depth {}'.format(predix))

@@ -1,4 +1,5 @@
 import numpy as np
+import cupy as cp
 import skimage
 import skimage.io
 
@@ -30,7 +31,7 @@ parser = argparse.ArgumentParser(description='Evaluating Anynet')
 parser.add_argument('--datapath', default=None, help='datapath')
 parser.add_argument('--pretrained', type=str, default=None, help='pretrained model path')
 parser.add_argument('--split_file', type=str, default=None)
-parser.add_argument('--save_path', type=str, default='results/pseudoLidar_test1/', help='the path of saving checkpoints and log')
+parser.add_argument('--save_path', type=str, default='results/pseudoLidar_cupy/', help='the path of saving checkpoints and log')
 
 """ OPTIONS """
 parser.add_argument('--with_spn', action='store_true', help='with spn network or not')
@@ -85,71 +86,63 @@ def main():
     cudnn.benchmark = True
     all_outputs = evaluate(TestImgLoader, model)
 
-    pool = Pool(args.threads)
-    pbar = tqdm(total=(len(all_outputs)), desc="Generating Results", unit='Example')
-    def update(*a):
-        pbar.update()
+    # pool = Pool(args.threads)
+    # pbar = tqdm(total=(len(all_outputs)), desc="Generating Results", unit='Example')
+    # def update(*a):
+    #     pbar.update()
     
-    for i, image in enumerate(all_outputs):
-        pool.apply_async(sparse_and_save, args=(args, i, image), callback=update)
+    # for i, image in enumerate(all_outputs):
+        # sparse_and_save(args, i, image)
+        # update()
+        # pool.apply_async(sparse_and_save, args=(args, i, image), callback=update)
 
-    pool.close()
-    pool.join()
-    pbar.clear(nolock=False)
-    pbar.close()
+    # pool.close()
+    # pool.join()
+    # pbar.clear(nolock=False)
+    # pbar.close()
 
 def evaluate(dataloader, model):
-    all_outputs = []
+    total_time = 0
     model.eval()
-    for i, (imgL, imgR) in tqdm(enumerate(dataloader), desc="Preparing Examples", total=(len(dataloader)), unit='Example'):
+    for i, (imgL, imgR) in tqdm(enumerate(dataloader), desc="Generating Examples", total=(len(dataloader)), unit='Example'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         with torch.no_grad():
+            start_time = time.time()
             outputs = model(imgL, imgR)
-            all_outputs.append(torch.squeeze(outputs[3], 1).cpu())
-    return all_outputs
+            output3 = torch.squeeze(outputs[3], 1)
+            sparse_and_save(args, i, output3.cpu())
+            if i > 0:
+                total_time = total_time + (time.time() - start_time)
+            print("Time:    {} ms".format((time.time() - start_time)*1000))
+    print("Average Time:    {} ms   ~   {} FPS".format((total_time * 1000)/(len(dataloader) - 1), (len(dataloader) - 1)/total_time))
+    return
 
 
 def sparse_and_save(args, i, image):
-    img_cpu = np.asarray(image)
+    img_cpu = cp.asarray(image)
     disp_map = img_cpu[0, :, :]
     predix = str(i).zfill(6)
     calib_file = '{}/{}.txt'.format(args.datapath +'/training/calib', predix)
     calib = Calibration(calib_file)
 
-    """ Disparity npy Generation """
-    # disp_images_path = args.save_path + 'disparity/'
-    # disp_npy_path = args.save_path + 'npy/'
-    
-    # if not os.path.isdir(disp_images_path):
-    #     os.makedirs(disp_images_path)
-    # if not os.path.isdir(disp_npy_path):
-    #     os.makedirs(disp_npy_path)
-
-    # skimage.io.imsave(disp_images_path  + predix + '.png', (disp_map*255).astype('uint8'))
-    # np.save(disp_npy_path + predix, disp_map)
-    
     """ LiDAR Generation """
-    # point_cloud_path = args.save_path + 'point_cloud'
-    # if not os.path.isdir(point_cloud_path):
-    #     os.makedirs(point_cloud_path)
     lidar = gen_lidar(disp_map, calib)
-    # lidar.tofile('{}/{}.bin'.format(point_cloud_path, predix))
 
     """ Sparse LiDAR Generation """    
     sparse_point_cloud_path = args.save_path + 'sparse_point_cloud'
     if not os.path.isdir(sparse_point_cloud_path):
         os.makedirs(sparse_point_cloud_path)
     sparse_points = gen_sparse_points(lidar, H = args.H, W= args.W, slice=args.slice)
-    sparse_points = sparse_points.astype(np.float32)
+    sparse_points = sparse_points.astype(cp.float32)
     sparse_points.tofile('{}/{}.bin'.format(sparse_point_cloud_path, predix))
     return
 
 def gen_lidar(disp_map, calib, max_high=1):
-    disp_map = (disp_map*255).astype(np.float32)/255.
+    disp_map = (disp_map*255).astype(cp.float32)/255.
     lidar = project_disp_to_points(calib, disp_map, max_high)
-    lidar = np.concatenate([lidar, np.ones((lidar.shape[0], 1))], 1)
-    lidar = lidar.astype(np.float32)
+    lidar = cp.concatenate([lidar, cp.ones((lidar.shape[0], 1))], 1)
+    lidar = lidar.astype(cp.float32)
     return lidar
 
 def gen_sparse_points(lidar, H=64, W=512, D=700, slice=1):
