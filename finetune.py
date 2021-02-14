@@ -68,19 +68,27 @@ def main():
     log = logger.setup_logger(args.save_path + '/training.log')
 
     if args.datatype == 'other':
-        train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
+        train_left_img, train_right_img, train_left_disp, train_calib, test_left_img, test_right_img, test_left_disp, test_calib = ls.dataloader(
             args.datapath, args.train_file, args.validation_file)
+        
+        TrainImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, train_calib, True),
+            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+
+        TestImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, test_calib, False),
+            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
     else:
         train_left_img, train_right_img, train_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(
             args.datapath, log, args.split_file)
 
-    TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
-        batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
+        TrainImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(train_left_img, train_right_img, train_left_disp, True),
+            batch_size=args.train_bsize, shuffle=True, num_workers=4, drop_last=False)
 
-    TestImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
-        batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
+        TestImgLoader = torch.utils.data.DataLoader(
+            DA.myImageFloder(test_left_img, test_right_img, test_left_disp, False),
+            batch_size=args.test_bsize, shuffle=False, num_workers=4, drop_last=False)
     
     if not os.path.isdir(args.save_path):
         os.makedirs(args.save_path)
@@ -143,6 +151,14 @@ def main():
     log.info('full training time = {:.2f} Hours'.format((time.time() - start_full_time) / 3600))
 
 
+def disp2depth(disp, calib=None):
+
+    if calib is None:
+        depth = (0.54 * 7.215377000000e+02) / disp.clamp(min=1e-8)
+    else:
+        depth = calib[:, None, None] / disp.clamp(min=1e-8)
+    return depth
+
 def train(dataloader, model, optimizer, log, epoch=0):
 
     stages = 3 + args.with_spn
@@ -150,9 +166,10 @@ def train(dataloader, model, optimizer, log, epoch=0):
     length_loader = len(dataloader)
     model.train()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc=("training epoch " + str(epoch)), total=(length_loader), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L, calib) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc=("training epoch " + str(epoch)), total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
+        calib = calib.float().cuda()
         disp_L = disp_L.float().cuda()
 
         optimizer.zero_grad()
@@ -170,7 +187,7 @@ def train(dataloader, model, optimizer, log, epoch=0):
 
         outputs = [torch.squeeze(output, 1) for output in outputs]
 
-        loss = [args.loss_weights[x] * F.smooth_l1_loss(outputs[x][mask], disp_L[mask], reduction='mean')
+        loss = [args.loss_weights[x] * F.smooth_l1_loss(disp2depth(outputs[x][mask], calib), disp2depth(disp_L[mask], calib), reduction='mean')
                 for x in range(num_out)]
         sum(loss).backward()
         optimizer.step()
@@ -200,7 +217,7 @@ def test(dataloader, model, log, epoch=-1):
     }
     model.eval()
 
-    for batch_idx, (imgL, imgR, disp_L) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Testing", total=(length_loader), unit='iteration'):
+    for batch_idx, (imgL, imgR, disp_L, calib) in tqdm.tqdm(enumerate(dataloader), ascii=True, desc="Testing", total=(length_loader), unit='iteration'):
         imgL = imgL.float().cuda()
         imgR = imgR.float().cuda()
         disp_L = disp_L.float().cuda()
