@@ -146,7 +146,6 @@ def sparse_and_save(args, i, image):
     if not os.path.isdir(sparse_point_cloud_path):
         os.makedirs(sparse_point_cloud_path)
     sparse_points = gen_sparse_points(lidar, H = args.H, W= args.W, slice=args.slice)
-    sparse_points = sparse_points.astype(np.float32)
     sparse_points.tofile('{}/{}.bin'.format(sparse_point_cloud_path, predix))
     return
 
@@ -167,6 +166,7 @@ def gen_sparse_points(lidar, H=64, W=512, D=700, slice=1):
                     (pc_velo[:, 2] >= -2.5)
     pc_velo = pc_velo[valid_inds]
     sparse_points = pto_ang_map(pc_velo, H=H, W=W, slice=slice)
+    sparse_points = sparse_points.astype(np.float32)
     return sparse_points
 
 def conv_disp_to_depth(disp_map, calib):
