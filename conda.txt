@@ -1,14 +1,20 @@
 1 - Make anaconda enviroment with python 3.6
 
-conda create --name anynet python=3.6
+conda create --name obj_det python=3.8.5
 
 2 - Navigate the enviroment
 
-conda activate anynet
+conda activate obj_det
 
 3 - Install pytorch 1.0 and cuda 10.0
 
-conda install pytorch==1.0.1 torchvision==0.2.2 cudatoolkit=10.0 -c pytorch
+conda install -c pytorch torchvision=0.8.2
+pip install PyQt5
+pip install vtk
+pip install mayavi
+conda install scikit-image shapely
+conda install -c conda-forge opencv
+pip install tqdm
 
 4 - Navigate to models/spn_t1, try to run make.sh, through git cli
 

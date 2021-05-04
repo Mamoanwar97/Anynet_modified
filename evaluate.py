@@ -111,7 +111,6 @@ def evaluate(dataloader, model):
             sparse_and_save(args, i, output3.cpu())
             if i > 0:
                 total_time = total_time + (time.time() - start_time)
-            print("Time:    {} ms".format((time.time() - start_time)*1000))
     print("Average Time:    {} ms   ~   {} FPS".format((total_time * 1000)/(len(dataloader) - 1), (len(dataloader) - 1)/total_time))
     return
 
